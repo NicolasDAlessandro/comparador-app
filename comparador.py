@@ -104,7 +104,7 @@ class ComparadorApp:
                 detalle_presea = mapa_presea.get(codigo, "❌ NO encontrado")
                 matcheo.append([idx + 1, codigo, detalle_presea, detalle_mercado])
 
-            self.df_matcheo = pd.DataFrame(matcheo, columns=["NRO", "CODIGO", "DETALLE_PRESEA", "DETALLE_MERCADO"])
+            self.df_matcheo = pd.DataFrame(matcheo, columns=["NRO", "CODIGO", "DETALLE_PRESEA", "TURTURICI"])
 
             # Mostrar tabla
             self.mostrar_tabla(self.df_matcheo)
