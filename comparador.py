@@ -148,16 +148,25 @@ class ComparadorApp:
 
         tabla = ttk.Treeview(self.frame_tabla, columns=list(df.columns), show="headings", style="Custom.Treeview")
 
-        for col in df.columns:
-            tabla.heading(col, text=col)
-            if col in ["NRO", "CODIGO"]:
-                tabla.column(col, width=100, anchor="center")
-            else:
-                tabla.column(col, width=250, anchor="w")
+        # 🔹 Ajuste de anchos
+        tabla.heading("NRO", text="NRO")
+        tabla.column("NRO", width=10, anchor="center")
 
+        tabla.heading("CODIGO", text="CODIGO")
+        tabla.column("CODIGO", width=90, anchor="center")
+
+        tabla.heading("DETALLE_PRESEA", text="DETALLE PRESEA")
+        tabla.column("DETALLE_PRESEA", width=400, anchor="w")
+
+        tabla.heading("TURTURICI", text="TURTURICI")
+        tabla.column("TURTURICI", width=400, anchor="w")
+
+        # 🔹 Insertar filas con estilos
         for i, fila in df.iterrows():
             if fila["DETALLE_PRESEA"] == "❌ NO encontrado":
                 tag = "notfound"
+            elif fila["DETALLE_PRESEA"].strip().upper() != str(fila["TURTURICI"]).strip().upper():
+                tag = "mismatch"
             else:
                 tag = "evenrow" if i % 2 == 0 else "oddrow"
 
@@ -167,6 +176,7 @@ class ComparadorApp:
         tabla.tag_configure("evenrow", background="black", foreground="white")
         tabla.tag_configure("oddrow", background="#111111", foreground="white")
         tabla.tag_configure("notfound", background="black", foreground="red", font=("Segoe UI", 9, "bold"))
+        tabla.tag_configure("mismatch", background="black", foreground="lime", font=("Segoe UI", 9, "bold"))
 
         tabla.pack(side="left", fill="both", expand=True)
 
