@@ -1,27 +1,68 @@
 import pandas as pd
 import tkinter as tk
-from tkinter import filedialog, messagebox
+from tkinter import filedialog, messagebox, ttk
+
 
 class ComparadorApp:
     def __init__(self, root):
         self.root = root
         self.root.title("Comparador de Productos")
-        self.root.geometry("400x200")
+        self.root.state('zoomed')
 
         self.archivo_cargados = None
         self.archivo_nuevos = None
 
-        # Botón para seleccionar productos en Presea
-        self.btn_presea = tk.Button(root, text="Seleccionar Productos en Presea", command=self.seleccionar_presea, width=40)
-        self.btn_presea.pack(pady=10)
+        # 🔹 Fondo general negro
+        self.root.configure(bg="black")
 
-        # Botón para seleccionar productos ingresados
-        self.btn_ingresados = tk.Button(root, text="Seleccionar Productos Ingresados", command=self.seleccionar_ingresados, width=40)
-        self.btn_ingresados.pack(pady=10)
+        # 🔹 Estilo Treeview personalizado
+        style = ttk.Style()
+        style.theme_use("clam")
+        style.configure(
+            "Custom.Treeview",
+            background="black",
+            foreground="white",
+            rowheight=25,
+            fieldbackground="black",
+            bordercolor="blue",
+            borderwidth=1,
+        )
+        style.configure(
+            "Custom.Treeview.Heading",
+            background="blue",
+            foreground="white",
+            font=("Segoe UI", 10, "bold")
+        )
+        style.map("Custom.Treeview", background=[("selected", "darkblue")])
 
-        # Botón para guardar resultado
-        self.btn_guardar = tk.Button(root, text="Generar archivo de faltantes", command=self.generar_resultado, width=40)
-        self.btn_guardar.pack(pady=20)
+        # Frame botones
+        self.frame_botones = tk.Frame(root, bg="black")
+        self.frame_botones.pack(pady=20)
+
+        tk.Button(self.frame_botones, text="Seleccionar Productos en Presea", 
+                  command=self.seleccionar_presea, width=50, bg="blue", fg="white").pack(pady=5)
+        tk.Button(self.frame_botones, text="Seleccionar Productos Ingresados", 
+                  command=self.seleccionar_ingresados, width=50, bg="blue", fg="white").pack(pady=5)
+        tk.Button(self.frame_botones, text="Generar archivo de faltantes", 
+                  command=self.generar_faltantes, width=50, bg="blue", fg="white").pack(pady=15)
+
+        # Frame para info de archivos seleccionados
+        self.frame_info = tk.Frame(root, bg="black")
+        self.frame_info.pack(pady=5)
+
+        self.label_presea = tk.Label(self.frame_info, text="Productos en Presea: ❌ No cargado", 
+                                     bg="black", fg="white", font=("Segoe UI", 9))
+        self.label_presea.pack(anchor="w")
+
+        self.label_ingresados = tk.Label(self.frame_info, text="Productos Ingresados: ❌ No cargado", 
+                                         bg="black", fg="white", font=("Segoe UI", 9))
+        self.label_ingresados.pack(anchor="w")
+
+        # Frame para la tabla
+        self.frame_tabla = tk.Frame(root, bg="black")
+        self.frame_tabla.pack(fill="both", expand=True)
+
+        self.df_matcheo = None  # se guarda el último DataFrame mostrado
 
     def seleccionar_presea(self):
         self.archivo_cargados = filedialog.askopenfilename(
@@ -29,7 +70,8 @@ class ComparadorApp:
             filetypes=[("Excel files", "*.xlsx *.xls")]
         )
         if self.archivo_cargados:
-            messagebox.showinfo("Archivo seleccionado", f"Productos en Presea:\n{self.archivo_cargados}")
+            self.label_presea.config(text=f"Productos en Presea: {self.archivo_cargados}", fg="cyan")
+            self.verificar_carga_completa()
 
     def seleccionar_ingresados(self):
         self.archivo_nuevos = filedialog.askopenfilename(
@@ -37,45 +79,100 @@ class ComparadorApp:
             filetypes=[("Excel files", "*.xlsx *.xls")]
         )
         if self.archivo_nuevos:
-            messagebox.showinfo("Archivo seleccionado", f"Productos ingresados:\n{self.archivo_nuevos}")
+            self.label_ingresados.config(text=f"Productos Ingresados: {self.archivo_nuevos}", fg="cyan")
+            self.verificar_carga_completa()
 
-    def generar_resultado(self):
-        if not self.archivo_cargados or not self.archivo_nuevos:
-            messagebox.showerror("Error", "Debes seleccionar ambos archivos antes de continuar.")
-            return
+    def verificar_carga_completa(self):
+        """Si ya se cargaron ambos archivos, mostrar la tabla automáticamente"""
+        if self.archivo_cargados and self.archivo_nuevos:
+            self.generar_tabla()
 
+    def generar_tabla(self):
         try:
-            # Leer archivos
             productos_cargados = pd.read_excel(self.archivo_cargados)
             productos_nuevos = pd.read_excel(self.archivo_nuevos, header=None)
 
-            # Tomar las columnas relevantes
-            codigos_cargados = productos_cargados["COD_ALFA"].astype(str).str.strip()
-            codigos_nuevos = productos_nuevos[0].astype(str).str.strip()
+            codigos_cargados = productos_cargados["COD_ALFA"].astype(str).str.strip().str.upper()
+            productos_nuevos[0] = productos_nuevos[0].astype(str).str.strip().str.upper()
 
-            # Filtrar los que no estén en los cargados
-            faltantes = productos_nuevos[~productos_nuevos[0].isin(codigos_cargados)]
+            mapa_presea = dict(zip(codigos_cargados, productos_cargados["DETALLE"]))
 
-            # Renombrar columnas MercadoLibre
-            faltantes.columns = ["COD_ALFA", "DETALLE", "STOCK", "PRECIO"]
+            matcheo = []
+            for idx, row in productos_nuevos.iterrows():
+                codigo = row[0]
+                detalle_mercado = row[1]
+                detalle_presea = mapa_presea.get(codigo, "❌ NO encontrado")
+                matcheo.append([idx + 1, codigo, detalle_presea, detalle_mercado])
 
-            # Establecer un nombre de archivo por defecto
-            nombre_por_defecto = "diferencias.xlsx"
+            self.df_matcheo = pd.DataFrame(matcheo, columns=["NRO", "CODIGO", "DETALLE_PRESEA", "DETALLE_MERCADO"])
 
-            # Seleccionar dónde guardar el archivo de salida
-            archivo_salida = filedialog.asksaveasfilename(
-                defaultextension=".xlsx",
-                filetypes=[("Excel files", "*.xlsx")],
-                initialfile=nombre_por_defecto,  # Establecer el nombre por defecto
-                title="Guardar archivo de faltantes como..."
-            )
-
-            if archivo_salida:
-                faltantes.to_excel(archivo_salida, index=False)
-                messagebox.showinfo("Éxito", f"Archivo generado con éxito:\n{archivo_salida}")
+            # Mostrar tabla
+            self.mostrar_tabla(self.df_matcheo)
 
         except Exception as e:
             messagebox.showerror("Error", str(e))
+            print("ERROR:", e)
+
+    def generar_faltantes(self):
+        """Genera el archivo de faltantes solo si hay DataFrame cargado"""
+        if self.df_matcheo is None:
+            messagebox.showerror("Error", "Primero debes cargar ambos archivos para ver la tabla.")
+            return
+
+        try:
+            productos_cargados = pd.read_excel(self.archivo_cargados)
+            productos_nuevos = pd.read_excel(self.archivo_nuevos, header=None)
+            codigos_cargados = productos_cargados["COD_ALFA"].astype(str).str.strip().str.upper()
+            productos_nuevos[0] = productos_nuevos[0].astype(str).str.strip().str.upper()
+
+            faltantes = productos_nuevos[~productos_nuevos[0].isin(codigos_cargados)].copy()
+            if not faltantes.empty:
+                faltantes.columns = ["COD_ALFA", "DETALLE", "STOCK", "PRECIO"]
+                archivo_salida = filedialog.asksaveasfilename(
+                    defaultextension=".xlsx",
+                    filetypes=[("Excel files", "*.xlsx")],
+                    title="Guardar archivo de faltantes como..."
+                )
+                if archivo_salida:
+                    faltantes.to_excel(archivo_salida, index=False)
+                    messagebox.showinfo("Éxito", f"Archivo generado con {len(faltantes)} faltantes.")
+            else:
+                messagebox.showinfo("Info", "No se encontraron faltantes.")
+        except Exception as e:
+            messagebox.showerror("Error", str(e))
+            print("ERROR:", e)
+
+    def mostrar_tabla(self, df):
+        for widget in self.frame_tabla.winfo_children():
+            widget.destroy()
+
+        tabla = ttk.Treeview(self.frame_tabla, columns=list(df.columns), show="headings", style="Custom.Treeview")
+
+        for col in df.columns:
+            tabla.heading(col, text=col)
+            if col in ["NRO", "CODIGO"]:
+                tabla.column(col, width=100, anchor="center")
+            else:
+                tabla.column(col, width=250, anchor="w")
+
+        for i, fila in df.iterrows():
+            if fila["DETALLE_PRESEA"] == "❌ NO encontrado":
+                tag = "notfound"
+            else:
+                tag = "evenrow" if i % 2 == 0 else "oddrow"
+
+            tabla.insert("", "end", values=list(fila), tags=(tag,))
+
+        # 🔹 Configuración de colores
+        tabla.tag_configure("evenrow", background="black", foreground="white")
+        tabla.tag_configure("oddrow", background="#111111", foreground="white")
+        tabla.tag_configure("notfound", background="black", foreground="red", font=("Segoe UI", 9, "bold"))
+
+        tabla.pack(side="left", fill="both", expand=True)
+
+        scrollbar_y = ttk.Scrollbar(self.frame_tabla, orient="vertical", command=tabla.yview)
+        tabla.configure(yscroll=scrollbar_y.set)
+        scrollbar_y.pack(side="right", fill="y")
 
 
 if __name__ == "__main__":
