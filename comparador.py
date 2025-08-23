@@ -45,6 +45,8 @@ class ComparadorApp:
                   command=self.seleccionar_ingresados, width=50, bg="blue", fg="white").pack(pady=5)
         tk.Button(self.frame_botones, text="Generar archivo de faltantes", 
                   command=self.generar_faltantes, width=50, bg="blue", fg="white").pack(pady=15)
+        tk.Button(self.frame_botones, text="Stock Turturici", 
+                  command=self.generar_stock_turturici, width=50, bg="green", fg="white").pack(pady=5)
 
         # Frame para info de archivos seleccionados
         self.frame_info = tk.Frame(root, bg="black")
@@ -138,6 +140,43 @@ class ComparadorApp:
                     messagebox.showinfo("Éxito", f"Archivo generado con {len(faltantes)} faltantes.")
             else:
                 messagebox.showinfo("Info", "No se encontraron faltantes.")
+        except Exception as e:
+            messagebox.showerror("Error", str(e))
+            print("ERROR:", e)
+
+    def generar_stock_turturici(self):
+        """Genera un archivo Excel con CODIGO (Presea), COD_ALFA y STOCK (Turturici)"""
+        if not self.archivo_cargados or not self.archivo_nuevos:
+            messagebox.showerror("Error", "Debes cargar ambos archivos primero.")
+            return
+
+        try:
+            presea = pd.read_excel(self.archivo_cargados)
+            mercado = pd.read_excel(self.archivo_nuevos, header=None)
+
+            presea["COD_ALFA"] = presea["COD_ALFA"].astype(str).str.strip().str.upper()
+            mercado[0] = mercado[0].astype(str).str.strip().str.upper()
+
+            # join por COD_ALFA
+            df_merge = pd.merge(
+                presea[["CODIGO", "COD_ALFA"]],
+                mercado[[0, 2]],  # 0 = COD_ALFA, 2 = STOCK
+                left_on="COD_ALFA",
+                right_on=0,
+                how="inner"
+            ).drop(columns=[0])  # eliminar columna duplicada
+
+            df_merge.rename(columns={2: "STOCK"}, inplace=True)
+
+            archivo_salida = filedialog.asksaveasfilename(
+                defaultextension=".xlsx",
+                filetypes=[("Excel files", "*.xlsx")],
+                title="Guardar archivo de Stock Turturici como..."
+            )
+            if archivo_salida:
+                df_merge.to_excel(archivo_salida, index=False)
+                messagebox.showinfo("Éxito", f"Archivo generado con {len(df_merge)} registros.")
+
         except Exception as e:
             messagebox.showerror("Error", str(e))
             print("ERROR:", e)
