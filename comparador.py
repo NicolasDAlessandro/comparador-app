@@ -12,10 +12,10 @@ class ComparadorApp:
         self.archivo_cargados = None
         self.archivo_nuevos = None
 
-        # 🔹 Fondo general negro
+        
         self.root.configure(bg="black")
 
-        # 🔹 Estilo Treeview personalizado
+        
         style = ttk.Style()
         style.theme_use("clam")
         style.configure(
@@ -35,7 +35,7 @@ class ComparadorApp:
         )
         style.map("Custom.Treeview", background=[("selected", "darkblue")])
 
-        # Frame botones
+        
         self.frame_botones = tk.Frame(root, bg="black")
         self.frame_botones.pack(pady=20)
 
@@ -48,7 +48,7 @@ class ComparadorApp:
         tk.Button(self.frame_botones, text="Stock Turturici", 
                   command=self.generar_stock_turturici, width=50, bg="green", fg="white").pack(pady=5)
 
-        # Frame para info de archivos seleccionados
+        
         self.frame_info = tk.Frame(root, bg="black")
         self.frame_info.pack(pady=5)
 
@@ -60,11 +60,11 @@ class ComparadorApp:
                                          bg="black", fg="white", font=("Segoe UI", 9))
         self.label_ingresados.pack(anchor="w")
 
-        # Frame para la tabla
+        
         self.frame_tabla = tk.Frame(root, bg="black")
         self.frame_tabla.pack(fill="both", expand=True)
 
-        self.df_matcheo = None  # se guarda el último DataFrame mostrado
+        self.df_matcheo = None  
 
     def seleccionar_presea(self):
         self.archivo_cargados = filedialog.askopenfilename(
@@ -94,26 +94,30 @@ class ComparadorApp:
             productos_cargados = pd.read_excel(self.archivo_cargados)
             productos_nuevos = pd.read_excel(self.archivo_nuevos, header=None)
 
-            codigos_cargados = productos_cargados["COD_ALFA"].astype(str).str.strip().str.upper()
+            
+            productos_cargados["COD_ALFA"] = productos_cargados["COD_ALFA"].astype(str).str.strip().str.upper()
             productos_nuevos[0] = productos_nuevos[0].astype(str).str.strip().str.upper()
 
-            mapa_presea = dict(zip(codigos_cargados, productos_cargados["DETALLE"]))
+            mapa_detalle = dict(zip(productos_cargados["COD_ALFA"], productos_cargados["DETALLE"]))
+            mapa_codigo_real = dict(zip(productos_cargados["COD_ALFA"], productos_cargados["CODIGO"]))
 
             matcheo = []
-            for idx, row in productos_nuevos.iterrows():
-                codigo = row[0]
+            for _, row in productos_nuevos.iterrows():
+                cod_alfa = row[0]
                 detalle_mercado = row[1]
-                detalle_presea = mapa_presea.get(codigo, "❌ NO encontrado")
-                matcheo.append([idx + 1, codigo, detalle_presea, detalle_mercado])
+                detalle_presea = mapa_detalle.get(cod_alfa, "❌ NO encontrado")
+                codigo_real = mapa_codigo_real.get(cod_alfa, "❌ NO encontrado")
+                matcheo.append([codigo_real, cod_alfa, detalle_presea, detalle_mercado])
 
-            self.df_matcheo = pd.DataFrame(matcheo, columns=["NRO", "CODIGO", "DETALLE_PRESEA", "TURTURICI"])
+            
+            self.df_matcheo = pd.DataFrame(matcheo, columns=["CODIGO", "COD_ALFA", "DETALLE_PRESEA", "TURTURICI"])
 
-            # Mostrar tabla
             self.mostrar_tabla(self.df_matcheo)
 
         except Exception as e:
             messagebox.showerror("Error", str(e))
             print("ERROR:", e)
+
 
     def generar_faltantes(self):
         """Genera el archivo de faltantes solo si hay DataFrame cargado"""
@@ -144,6 +148,7 @@ class ComparadorApp:
             messagebox.showerror("Error", str(e))
             print("ERROR:", e)
 
+
     def generar_stock_turturici(self):
         """Genera un archivo Excel con CODIGO (Presea), COD_ALFA y STOCK (Turturici)"""
         if not self.archivo_cargados or not self.archivo_nuevos:
@@ -157,7 +162,6 @@ class ComparadorApp:
             presea["COD_ALFA"] = presea["COD_ALFA"].astype(str).str.strip().str.upper()
             mercado[0] = mercado[0].astype(str).str.strip().str.upper()
 
-            # join por COD_ALFA
             df_merge = pd.merge(
                 presea[["CODIGO", "COD_ALFA"]],
                 mercado[[0, 2]],  # 0 = COD_ALFA, 2 = STOCK
@@ -167,6 +171,8 @@ class ComparadorApp:
             ).drop(columns=[0])  # eliminar columna duplicada
 
             df_merge.rename(columns={2: "STOCK"}, inplace=True)
+
+            df_merge = df_merge[df_merge["STOCK"] > 0]
 
             archivo_salida = filedialog.asksaveasfilename(
                 defaultextension=".xlsx",
@@ -181,18 +187,18 @@ class ComparadorApp:
             messagebox.showerror("Error", str(e))
             print("ERROR:", e)
 
+
     def mostrar_tabla(self, df):
         for widget in self.frame_tabla.winfo_children():
             widget.destroy()
 
         tabla = ttk.Treeview(self.frame_tabla, columns=list(df.columns), show="headings", style="Custom.Treeview")
 
-        # 🔹 Ajuste de anchos
-        tabla.heading("NRO", text="NRO")
-        tabla.column("NRO", width=10, anchor="center")
-
         tabla.heading("CODIGO", text="CODIGO")
         tabla.column("CODIGO", width=90, anchor="center")
+
+        tabla.heading("COD_ALFA", text="COD_ALFA")
+        tabla.column("COD_ALFA", width=90, anchor="center")
 
         tabla.heading("DETALLE_PRESEA", text="DETALLE PRESEA")
         tabla.column("DETALLE_PRESEA", width=400, anchor="w")
@@ -200,18 +206,16 @@ class ComparadorApp:
         tabla.heading("TURTURICI", text="TURTURICI")
         tabla.column("TURTURICI", width=400, anchor="w")
 
-        # 🔹 Insertar filas con estilos
         for i, fila in df.iterrows():
             if fila["DETALLE_PRESEA"] == "❌ NO encontrado":
                 tag = "notfound"
-            elif fila["DETALLE_PRESEA"].strip().upper() != str(fila["TURTURICI"]).strip().upper():
+            elif str(fila["DETALLE_PRESEA"]).strip().upper() != str(fila["TURTURICI"]).strip().upper():
                 tag = "mismatch"
             else:
                 tag = "evenrow" if i % 2 == 0 else "oddrow"
 
             tabla.insert("", "end", values=list(fila), tags=(tag,))
 
-        # 🔹 Configuración de colores
         tabla.tag_configure("evenrow", background="black", foreground="white")
         tabla.tag_configure("oddrow", background="#111111", foreground="white")
         tabla.tag_configure("notfound", background="black", foreground="red", font=("Segoe UI", 9, "bold"))
