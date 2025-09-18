@@ -12,10 +12,9 @@ class ComparadorApp:
         self.archivo_cargados = None
         self.archivo_nuevos = None
 
-        
         self.root.configure(bg="black")
 
-        
+        # Estilo de la tabla
         style = ttk.Style()
         style.theme_use("clam")
         style.configure(
@@ -35,36 +34,36 @@ class ComparadorApp:
         )
         style.map("Custom.Treeview", background=[("selected", "darkblue")])
 
-        
+        # Botones
         self.frame_botones = tk.Frame(root, bg="black")
         self.frame_botones.pack(pady=20)
 
-        tk.Button(self.frame_botones, text="Seleccionar Productos en Presea", 
+        tk.Button(self.frame_botones, text="Seleccionar Productos en Presea",
                   command=self.seleccionar_presea, width=50, bg="blue", fg="white").pack(pady=5)
-        tk.Button(self.frame_botones, text="Seleccionar Productos Ingresados", 
+        tk.Button(self.frame_botones, text="Seleccionar Productos Ingresados",
                   command=self.seleccionar_ingresados, width=50, bg="blue", fg="white").pack(pady=5)
-        tk.Button(self.frame_botones, text="Generar archivo de faltantes", 
+        tk.Button(self.frame_botones, text="Generar archivo de faltantes",
                   command=self.generar_faltantes, width=50, bg="blue", fg="white").pack(pady=15)
-        tk.Button(self.frame_botones, text="Stock Turturici", 
+        tk.Button(self.frame_botones, text="Stock Turturici",
                   command=self.generar_stock_turturici, width=50, bg="green", fg="white").pack(pady=5)
 
-        
+        # Labels de estado
         self.frame_info = tk.Frame(root, bg="black")
         self.frame_info.pack(pady=5)
 
-        self.label_presea = tk.Label(self.frame_info, text="Productos en Presea: ❌ No cargado", 
+        self.label_presea = tk.Label(self.frame_info, text="Productos en Presea: ❌ No cargado",
                                      bg="black", fg="white", font=("Segoe UI", 9))
         self.label_presea.pack(anchor="w")
 
-        self.label_ingresados = tk.Label(self.frame_info, text="Productos Ingresados: ❌ No cargado", 
+        self.label_ingresados = tk.Label(self.frame_info, text="Productos Ingresados: ❌ No cargado",
                                          bg="black", fg="white", font=("Segoe UI", 9))
         self.label_ingresados.pack(anchor="w")
 
-        
+        # Tabla
         self.frame_tabla = tk.Frame(root, bg="black")
         self.frame_tabla.pack(fill="both", expand=True)
 
-        self.df_matcheo = None  
+        self.df_matcheo = None
 
     def seleccionar_presea(self):
         self.archivo_cargados = filedialog.askopenfilename(
@@ -85,7 +84,6 @@ class ComparadorApp:
             self.verificar_carga_completa()
 
     def verificar_carga_completa(self):
-        """Si ya se cargaron ambos archivos, mostrar la tabla automáticamente"""
         if self.archivo_cargados and self.archivo_nuevos:
             self.generar_tabla()
 
@@ -94,7 +92,6 @@ class ComparadorApp:
             productos_cargados = pd.read_excel(self.archivo_cargados)
             productos_nuevos = pd.read_excel(self.archivo_nuevos, header=None)
 
-            
             productos_cargados["COD_ALFA"] = productos_cargados["COD_ALFA"].astype(str).str.strip().str.upper()
             productos_nuevos[0] = productos_nuevos[0].astype(str).str.strip().str.upper()
 
@@ -109,7 +106,6 @@ class ComparadorApp:
                 codigo_real = mapa_codigo_real.get(cod_alfa, "❌ NO encontrado")
                 matcheo.append([codigo_real, cod_alfa, detalle_presea, detalle_mercado])
 
-            
             self.df_matcheo = pd.DataFrame(matcheo, columns=["CODIGO", "COD_ALFA", "DETALLE_PRESEA", "TURTURICI"])
 
             self.mostrar_tabla(self.df_matcheo)
@@ -118,9 +114,7 @@ class ComparadorApp:
             messagebox.showerror("Error", str(e))
             print("ERROR:", e)
 
-
     def generar_faltantes(self):
-        """Genera el archivo de faltantes solo si hay DataFrame cargado"""
         if self.df_matcheo is None:
             messagebox.showerror("Error", "Primero debes cargar ambos archivos para ver la tabla.")
             return
@@ -148,9 +142,7 @@ class ComparadorApp:
             messagebox.showerror("Error", str(e))
             print("ERROR:", e)
 
-
     def generar_stock_turturici(self):
-        """Genera un archivo Excel con CODIGO (Presea), COD_ALFA y STOCK (Turturici)"""
         if not self.archivo_cargados or not self.archivo_nuevos:
             messagebox.showerror("Error", "Debes cargar ambos archivos primero.")
             return
@@ -162,20 +154,23 @@ class ComparadorApp:
             presea["COD_ALFA"] = presea["COD_ALFA"].astype(str).str.strip().str.upper()
             mercado[0] = mercado[0].astype(str).str.strip().str.upper()
 
+            # 🔑 convertir STOCK a entero desde la lectura
+            mercado[2] = pd.to_numeric(mercado[2], errors="coerce").fillna(0).astype("Int64")
+
             df_merge = pd.merge(
                 presea[["CODIGO", "COD_ALFA"]],
-                mercado[[0, 2]],  # 0 = COD_ALFA, 2 = STOCK
+                mercado[[0, 2]],
                 left_on="COD_ALFA",
                 right_on=0,
                 how="inner"
-            ).drop(columns=[0])  # eliminar columna duplicada
-
+            ).drop(columns=[0])
             df_merge.rename(columns={2: "STOCK"}, inplace=True)
 
+            # 🔑 tipado correcto
             df_merge = df_merge.astype({
-                "CODIGO": "Int64",    
-                "COD_ALFA": "string",  
-                "STOCK": "Int64"       
+                "CODIGO": "Int64",
+                "COD_ALFA": "string",
+                "STOCK": "Int64"
             })
 
             df_merge = df_merge[df_merge["STOCK"] > 0]
@@ -186,13 +181,12 @@ class ComparadorApp:
                 title="Guardar archivo de Stock Turturici como..."
             )
             if archivo_salida:
-                df_merge.to_excel(archivo_salida, index=False)
+                df_merge.to_excel(archivo_salida, index=False, engine="openpyxl")
                 messagebox.showinfo("Éxito", f"Archivo generado con {len(df_merge)} registros.")
 
         except Exception as e:
             messagebox.showerror("Error", str(e))
             print("ERROR:", e)
-
 
     def mostrar_tabla(self, df):
         for widget in self.frame_tabla.winfo_children():
