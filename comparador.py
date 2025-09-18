@@ -172,6 +172,12 @@ class ComparadorApp:
 
             df_merge.rename(columns={2: "STOCK"}, inplace=True)
 
+            df_merge = df_merge.astype({
+                "CODIGO": "Int64",    
+                "COD_ALFA": "string",  
+                "STOCK": "Int64"       
+            })
+
             df_merge = df_merge[df_merge["STOCK"] > 0]
 
             archivo_salida = filedialog.asksaveasfilename(
